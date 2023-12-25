@@ -2,7 +2,10 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.management import call_command
 from django.http import HttpResponse
 from django.views import View
-import io
+import io, os
+import tempfile
+from django.core.files.storage import FileSystemStorage
+
 
 class DumpDataView(UserPassesTestMixin, View):
     def test_func(self):
@@ -31,10 +34,15 @@ class LoadDataView(UserPassesTestMixin, View):
         # Get the file from the request
         data_file = request.FILES['data']
 
-        # Create a StringIO object from the file
-        data_io = io.StringIO(data_file.read().decode())
+        # Save the file to a temporary location
+        fs = FileSystemStorage(location=tempfile.gettempdir())
+        filename = fs.save(data_file.name, data_file)
+        filepath = fs.path(filename)
 
-        # Call the 'loaddata' command and load the data from the StringIO object
-        call_command('loaddata', stdin=data_io)
+        # Call the 'loaddata' command with the path of the uploaded file
+        call_command('loaddata', filepath)
 
-        return HttpResponse('Data loaded successfully.')
+        # Delete the temporary file
+        fs.delete(filepath)
+
+        return HttpResponse('Data loaded successfully')
